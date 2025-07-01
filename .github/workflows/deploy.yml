@@ -1,0 +1,46 @@
+name: 🎓 WMC 606 - Advanced CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+  schedule:
+    - cron: '0 6 * * *'  # Daily security scans
+  workflow_dispatch:      # Manual trigger
+
+jobs:
+  # 🧪 STAGE 1: Comprehensive Testing
+  test:
+    name: 🧪 Test Data Structures & Algorithms
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        java-version: [17]
+        
+  # 🔒 STAGE 2: Security & Quality Analysis  
+  security:
+    name: 🔒 Security & Quality Analysis
+    needs: test
+    
+  # 🏗️ STAGE 3: Build & Package
+  build:
+    name: 🏗️ Build Spring Boot Application
+    needs: [test, security]
+    
+  # 🚀 STAGE 4: Deploy to AWS
+  deploy:
+    name: 🚀 Deploy to Production
+    needs: build
+    if: github.ref == 'refs/heads/main'
+    
+  # ✅ STAGE 5: Post-Deployment Verification
+  verify:
+    name: ✅ Verify Deployment
+    needs: deploy
+    
+  # 📊 STAGE 6: Monitoring & Reporting
+  report:
+    name: 📊 Generate Reports
+    needs: verify
+    if: always()
