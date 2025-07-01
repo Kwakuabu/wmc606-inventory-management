@@ -1,7 +1,20 @@
 package com.wmc606.inventory.entities;
 
-import jakarta.persistence.*;
 import java.util.List;
+
+import com.fasterxml.jackson.annotation.JsonIgnore;
+
+import jakarta.persistence.CascadeType;
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
+import jakarta.persistence.FetchType;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.OneToMany;
+import jakarta.persistence.Table;
 
 /**
  * Category Entity - Represents product categories
@@ -29,8 +42,9 @@ public class Category {
     @Column(columnDefinition = "TEXT")
     private String description;
     
-    // One-to-Many relationship with Product
+    // FIXED: Add @JsonIgnore to prevent infinite recursion
     @OneToMany(mappedBy = "category", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+    @JsonIgnore
     private List<Product> products;
     
     /**

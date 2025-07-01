@@ -1,8 +1,19 @@
 package com.wmc606.inventory.entities;
 
-import jakarta.persistence.*;
 import java.time.LocalDateTime;
 import java.util.List;
+
+import com.fasterxml.jackson.annotation.JsonIgnore;
+
+import jakarta.persistence.CascadeType;
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.FetchType;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.OneToMany;
+import jakarta.persistence.Table;
 
 /**
  * Vendor Entity - Represents suppliers/vendors
@@ -35,8 +46,9 @@ public class Vendor {
     @Column(name = "created_at")
     private LocalDateTime createdAt;
     
-    // One-to-Many relationship with Product
+    // FIXED: Add @JsonIgnore to prevent infinite recursion
     @OneToMany(mappedBy = "vendor", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+    @JsonIgnore
     private List<Product> products;
     
     // Constructors
