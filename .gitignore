@@ -1,0 +1,70 @@
+# Compiled class files
+*.class
+
+# Log files
+*.log
+
+# Maven target directory
+target/
+
+# IntelliJ IDEA files
+.idea/
+*.iws
+*.iml
+*.ipr
+
+# Eclipse files
+.project
+.classpath
+.c9/
+*.tmp
+*.bak
+*.swp
+*~.nib
+local.properties
+.settings/
+.loadpath
+.recommenders
+
+# VS Code files
+.vscode/
+
+# macOS files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Package Files
+*.jar
+*.war
+*.nar
+*.ear
+*.zip
+*.tar.gz
+*.rar
+
+# Application specific
+application-local.properties
+application-dev.properties
+
+# JRebel
+rebel.xml
+
+# CMake
+CMakeLists.txt.user
+CMakeCache.txt
+CMakeFiles/
+
+# Database files (if using file-based DB)
+*.db
+*.sqlite
+
+# Spring Boot DevTools restart files
+.spring-boot-devtools.properties
+
+# HSQLDB files
+*.hsqldb
