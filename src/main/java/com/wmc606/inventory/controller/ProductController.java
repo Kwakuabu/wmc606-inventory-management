@@ -1,16 +1,31 @@
 package com.wmc606.inventory.controller;
 
-import com.wmc606.inventory.entities.Product;
-import com.wmc606.inventory.entities.Sale;
-import com.wmc606.inventory.service.InventoryManager;
-import com.wmc606.inventory.repository.ProductRepository;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.CrossOrigin;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
 
-import java.util.List;
-import java.util.Map;
+import com.wmc606.inventory.entities.Category;
+import com.wmc606.inventory.entities.Product;
+import com.wmc606.inventory.entities.Sale;
+import com.wmc606.inventory.entities.Vendor;
+import com.wmc606.inventory.repository.CategoryRepository;
+import com.wmc606.inventory.repository.ProductRepository;
+import com.wmc606.inventory.repository.VendorRepository;
+import com.wmc606.inventory.service.InventoryManager;
 
 /**
  * ProductController - REST API endpoints for product management
@@ -26,6 +41,13 @@ public class ProductController {
     
     @Autowired
     private ProductRepository productRepository;
+    
+    // FIXED: Added missing repository dependencies
+    @Autowired
+    private CategoryRepository categoryRepository;
+    
+    @Autowired 
+    private VendorRepository vendorRepository;
     
     /**
      * Get all products
@@ -68,24 +90,87 @@ public class ProductController {
     }
     
     /**
-     * Add new product with quantity (uses data structures)
+     * Add new product with quantity (uses data structures) - FIXED DEBUG VERSION
      * POST /api/products
      */
     @PostMapping
     public ResponseEntity<?> addProduct(@RequestBody ProductRequest request) {
         try {
-            System.out.println("🌐 API: Adding new product");
-            System.out.println("📦 Product: " + request.getProduct().getName());
+            System.out.println("🌐 API: Adding new product - DEBUG MODE");
+            System.out.println("📦 Product name: " + request.getProduct().getName());
             System.out.println("📊 Quantity: " + request.getQuantity());
             
-            Product product = inventoryManager.addGoodsToInventory(request.getProduct(), request.getQuantity());
+            // DEBUG: Check the incoming category data
+            Product productData = request.getProduct();
+            Category incomingCategory = productData.getCategory();
             
-            System.out.println("✅ Product added successfully with ID: " + product.getProductId());
-            return ResponseEntity.status(HttpStatus.CREATED).body(product);
+            System.out.println("🔍 DEBUG: Incoming category info:");
+            if (incomingCategory != null) {
+                System.out.println("   - Category ID from frontend: " + incomingCategory.getCategoryId());
+                System.out.println("   - Category name from frontend: " + incomingCategory.getName());
+                System.out.println("   - Category dataStructureType from frontend: " + incomingCategory.getDataStructureType());
+            } else {
+                System.out.println("   - ❌ Category is NULL from frontend!");
+                return ResponseEntity.badRequest()
+                    .body(Map.of("error", "Category cannot be null"));
+            }
+            
+            // DEBUG: Fetch the category from database
+            Long categoryId = incomingCategory.getCategoryId();
+            System.out.println("🔍 DEBUG: Looking up category ID " + categoryId + " in database...");
+            
+            Optional<Category> categoryOptional = categoryRepository.findById(categoryId);
+            if (!categoryOptional.isPresent()) {
+                System.out.println("❌ DEBUG: Category not found in database with ID: " + categoryId);
+                return ResponseEntity.badRequest()
+                    .body(Map.of("error", "Category not found with ID: " + categoryId));
+            }
+            
+            Category dbCategory = categoryOptional.get();
+            System.out.println("✅ DEBUG: Category found in database:");
+            System.out.println("   - ID: " + dbCategory.getCategoryId());
+            System.out.println("   - Name: " + dbCategory.getName());
+            System.out.println("   - DataStructureType: " + dbCategory.getDataStructureType());
+            System.out.println("   - Description: " + dbCategory.getDescription());
+            
+            // DEBUG: Check if dataStructureType is null
+            if (dbCategory.getDataStructureType() == null) {
+                System.out.println("❌ DEBUG: DataStructureType is NULL in database category!");
+                return ResponseEntity.badRequest()
+                    .body(Map.of("error", "Category has null DataStructureType. Category ID: " + categoryId));
+            }
+            
+            // Set the correct category from database
+            productData.setCategory(dbCategory);
+            
+            // DEBUG: Verify vendor
+            if (productData.getVendor() != null && productData.getVendor().getVendorId() != null) {
+                Optional<Vendor> vendorOptional = vendorRepository.findById(productData.getVendor().getVendorId());
+                if (!vendorOptional.isPresent()) {
+                    System.out.println("❌ DEBUG: Vendor not found with ID: " + productData.getVendor().getVendorId());
+                    return ResponseEntity.badRequest()
+                        .body(Map.of("error", "Vendor not found"));
+                }
+                productData.setVendor(vendorOptional.get());
+                System.out.println("✅ DEBUG: Vendor set: " + vendorOptional.get().getName());
+            } else {
+                System.out.println("❌ DEBUG: Vendor is null or has null ID");
+                return ResponseEntity.badRequest()
+                    .body(Map.of("error", "Vendor cannot be null"));
+            }
+            
+            System.out.println("🔍 DEBUG: About to call inventoryManager.addGoodsToInventory...");
+            Product savedProduct = inventoryManager.addGoodsToInventory(productData, request.getQuantity());
+            
+            System.out.println("✅ DEBUG: Product added successfully with ID: " + savedProduct.getProductId());
+            return ResponseEntity.status(HttpStatus.CREATED).body(savedProduct);
+            
         } catch (Exception e) {
-            System.err.println("❌ Error adding product: " + e.getMessage());
+            System.err.println("❌ DEBUG: Exception in addProduct: " + e.getClass().getSimpleName());
+            System.err.println("❌ DEBUG: Exception message: " + e.getMessage());
+            e.printStackTrace();
             return ResponseEntity.badRequest()
-                .body(Map.of("error", "Failed to add product", "message", e.getMessage()));
+                .body(Map.of("error", "Failed to add product", "message", e.getMessage(), "type", e.getClass().getSimpleName()));
         }
     }
     
@@ -127,7 +212,7 @@ public class ProductController {
     @DeleteMapping("/{id}")
     public ResponseEntity<?> deleteProduct(@PathVariable Long id) {
         try {
-            System.out.println("�� API: Deleting product ID: " + id);
+            System.out.println("🌐 API: Deleting product ID: " + id);
             
             return productRepository.findById(id)
                     .map(product -> {

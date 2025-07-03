@@ -1,14 +1,15 @@
 package com.wmc606.inventory.repository;
 
-import com.wmc606.inventory.entities.Sale;
+import java.math.BigDecimal;
+import java.time.LocalDateTime;
+import java.util.List;
+
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
-import java.math.BigDecimal;
-import java.time.LocalDateTime;
-import java.util.List;
+import com.wmc606.inventory.entities.Sale;
 
 /**
  * SaleRepository - Data access layer for Sale entity
@@ -57,10 +58,10 @@ public interface SaleRepository extends JpaRepository<Sale, Long> {
     List<Sale> findRecentSales();
     
     /**
-     * Get sales summary - total quantity and amount
+     * Get sales summary - total quantity and amount - FIXED VERSION
      * @return Object array containing [totalQuantity, totalAmount]
      */
-    @Query("SELECT SUM(s.quantitySold), SUM(s.totalAmount) FROM Sale s")
+    @Query("SELECT COALESCE(SUM(s.quantitySold), 0), COALESCE(SUM(s.totalAmount), 0.0) FROM Sale s")
     Object[] getSalesSummary();
     
     /**
@@ -93,7 +94,6 @@ public interface SaleRepository extends JpaRepository<Sale, Long> {
     
     /**
      * Get top selling products
-     * @param limit Number of top products to return
      * @return List of Object arrays containing [productName, totalQuantity, totalAmount]
      */
     @Query("SELECT s.product.name, SUM(s.quantitySold), SUM(s.totalAmount) " +
@@ -107,7 +107,7 @@ public interface SaleRepository extends JpaRepository<Sale, Long> {
      * @param endDate End date
      * @return Total revenue for the date range
      */
-    @Query("SELECT SUM(s.totalAmount) FROM Sale s WHERE s.saleDate BETWEEN :startDate AND :endDate")
+    @Query("SELECT COALESCE(SUM(s.totalAmount), 0.0) FROM Sale s WHERE s.saleDate BETWEEN :startDate AND :endDate")
     BigDecimal getRevenueByDateRange(@Param("startDate") LocalDateTime startDate, 
                                     @Param("endDate") LocalDateTime endDate);
     
@@ -119,18 +119,18 @@ public interface SaleRepository extends JpaRepository<Sale, Long> {
     long getTotalSalesCount();
     
     /**
-     * Get total revenue
+     * Get total revenue - FIXED VERSION
      * @return Total revenue from all sales
      */
-    @Query("SELECT COALESCE(SUM(s.totalAmount), 0) FROM Sale s")
+    @Query("SELECT COALESCE(SUM(s.totalAmount), 0.0) FROM Sale s")
     BigDecimal getTotalRevenue();
     
     /**
-     * Get total items sold
+     * Get total items sold - FIXED VERSION
      * @return Total quantity of items sold
      */
     @Query("SELECT COALESCE(SUM(s.quantitySold), 0) FROM Sale s")
-    long getTotalItemsSold();
+    Long getTotalItemsSold();
     
     /**
      * Find sales above amount threshold
@@ -143,7 +143,7 @@ public interface SaleRepository extends JpaRepository<Sale, Long> {
      * Get daily sales summary for reporting
      * @return List of Object arrays containing [date, totalSales, totalAmount]
      */
-    @Query("SELECT DATE(s.saleDate), COUNT(s), SUM(s.totalAmount) " +
+    @Query("SELECT DATE(s.saleDate), COUNT(s), COALESCE(SUM(s.totalAmount), 0.0) " +
            "FROM Sale s GROUP BY DATE(s.saleDate) ORDER BY DATE(s.saleDate) DESC")
     List<Object[]> getDailySalesSummary();
     
@@ -151,8 +151,84 @@ public interface SaleRepository extends JpaRepository<Sale, Long> {
      * Get monthly sales summary
      * @return List of Object arrays containing [month, year, totalSales, totalAmount]
      */
-    @Query("SELECT MONTH(s.saleDate), YEAR(s.saleDate), COUNT(s), SUM(s.totalAmount) " +
+    @Query("SELECT MONTH(s.saleDate), YEAR(s.saleDate), COUNT(s), COALESCE(SUM(s.totalAmount), 0.0) " +
            "FROM Sale s GROUP BY YEAR(s.saleDate), MONTH(s.saleDate) " +
            "ORDER BY YEAR(s.saleDate) DESC, MONTH(s.saleDate) DESC")
     List<Object[]> getMonthlySalesSummary();
+    
+    /**
+     * Get average sale amount
+     * @return Average sale amount
+     */
+    @Query("SELECT COALESCE(AVG(s.totalAmount), 0.0) FROM Sale s")
+    BigDecimal getAverageSaleAmount();
+    
+    /**
+     * Get sales count for today
+     * @return Number of sales made today
+     */
+    @Query("SELECT COUNT(s) FROM Sale s WHERE DATE(s.saleDate) = CURDATE()")
+    long getTodaySalesCount();
+    
+    /**
+     * Get today's revenue
+     * @return Total revenue for today
+     */
+    @Query("SELECT COALESCE(SUM(s.totalAmount), 0.0) FROM Sale s WHERE DATE(s.saleDate) = CURDATE()")
+    BigDecimal getTodaysRevenue();
+    
+    /**
+     * Get sales count by customer
+     * @param customerName Customer name
+     * @return Number of sales for the customer
+     */
+    @Query("SELECT COUNT(s) FROM Sale s WHERE LOWER(s.customerName) = LOWER(:customerName)")
+    long getSalesCountByCustomer(@Param("customerName") String customerName);
+    
+    /**
+     * Get total amount spent by customer
+     * @param customerName Customer name
+     * @return Total amount spent by the customer
+     */
+    @Query("SELECT COALESCE(SUM(s.totalAmount), 0.0) FROM Sale s WHERE LOWER(s.customerName) = LOWER(:customerName)")
+    BigDecimal getTotalAmountByCustomer(@Param("customerName") String customerName);
+    
+    /**
+     * Get most recent sale
+     * @return The most recent sale
+     */
+    @Query("SELECT s FROM Sale s ORDER BY s.saleDate DESC")
+    List<Sale> getMostRecentSale();
+    
+    /**
+     * Get sales statistics for a specific product
+     * @param productId Product ID
+     * @return Object array containing [totalQuantity, totalAmount, salesCount]
+     */
+    @Query("SELECT COALESCE(SUM(s.quantitySold), 0), COALESCE(SUM(s.totalAmount), 0.0), COUNT(s) " +
+           "FROM Sale s WHERE s.product.productId = :productId")
+    Object[] getProductSalesStats(@Param("productId") Long productId);
+    
+    /**
+     * Get best selling product
+     * @return Object array containing [productName, totalQuantity, totalAmount]
+     */
+    @Query("SELECT s.product.name, SUM(s.quantitySold), SUM(s.totalAmount) " +
+           "FROM Sale s GROUP BY s.product.productId, s.product.name " +
+           "ORDER BY SUM(s.quantitySold) DESC")
+    List<Object[]> getBestSellingProduct();
+    
+    /**
+     * Get sales for the current month
+     * @return List of sales for current month
+     */
+    @Query("SELECT s FROM Sale s WHERE MONTH(s.saleDate) = MONTH(CURDATE()) AND YEAR(s.saleDate) = YEAR(CURDATE())")
+    List<Sale> getCurrentMonthSales();
+    
+    /**
+     * Get sales for the current week
+     * @return List of sales for current week
+     */
+    @Query("SELECT s FROM Sale s WHERE YEARWEEK(s.saleDate) = YEARWEEK(CURDATE())")
+    List<Sale> getCurrentWeekSales();
 }

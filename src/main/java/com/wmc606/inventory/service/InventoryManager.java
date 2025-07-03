@@ -1,15 +1,27 @@
 package com.wmc606.inventory.service;
 
-import com.wmc606.inventory.datastructures.*;
-import com.wmc606.inventory.entities.*;
-import com.wmc606.inventory.repository.*;
+import java.math.BigDecimal;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.math.BigDecimal;
-import java.util.*;
-import java.util.concurrent.ConcurrentHashMap;
+import com.wmc606.inventory.datastructures.CustomList;
+import com.wmc606.inventory.datastructures.CustomQueue;
+import com.wmc606.inventory.datastructures.CustomStack;
+import com.wmc606.inventory.entities.Category;
+import com.wmc606.inventory.entities.Product;
+import com.wmc606.inventory.entities.Sale;
+import com.wmc606.inventory.entities.Vendor;
+import com.wmc606.inventory.repository.CategoryRepository;
+import com.wmc606.inventory.repository.ProductRepository;
+import com.wmc606.inventory.repository.SaleRepository;
+import com.wmc606.inventory.repository.VendorRepository;
 
 /**
  * Core Inventory Management Service
@@ -288,32 +300,49 @@ public class InventoryManager {
     }
     
     /**
-     * Get sales summary with Map-based tracking
+     * Get sales summary with Map-based tracking - FIXED VERSION
      */
     public Map<String, Object> getSalesSummary() {
         System.out.println("📈 Generating sales summary...");
         
-        Object[] salesData = saleRepository.getSalesSummary();
-        Map<String, Object> summary = new HashMap<>();
-        
-        BigDecimal totalRevenue = BigDecimal.ZERO;
-        Long totalItemsSold = 0L;
-        
-        if (salesData.length > 0 && salesData[0] != null) {
-            totalItemsSold = (Long) salesData[0];
-            totalRevenue = (BigDecimal) salesData[1];
+        try {
+            // Use individual queries to avoid casting issues
+            Long totalItemsSold = saleRepository.getTotalItemsSold();
+            BigDecimal totalRevenue = saleRepository.getTotalRevenue();
+            
+            // Handle null values
+            if (totalItemsSold == null) {
+                totalItemsSold = 0L;
+            }
+            if (totalRevenue == null) {
+                totalRevenue = BigDecimal.ZERO;
+            }
+            
+            Map<String, Object> summary = new HashMap<>();
+            summary.put("totalRevenue", totalRevenue);
+            summary.put("totalItemsSold", totalItemsSold);
+            summary.put("productSales", new HashMap<>(productSalesMap)); // Map-based sales tracking
+            
+            System.out.println("📈 Sales Summary Generated:");
+            System.out.println("💰 Total Revenue: $" + totalRevenue);
+            System.out.println("📦 Total Items Sold: " + totalItemsSold);
+            System.out.println("🗺️ Product Sales Map size: " + productSalesMap.size());
+            
+            return summary;
+            
+        } catch (Exception e) {
+            System.err.println("❌ Error generating sales summary: " + e.getMessage());
+            e.printStackTrace();
+            
+            // Return empty summary on error
+            Map<String, Object> emptySummary = new HashMap<>();
+            emptySummary.put("totalRevenue", BigDecimal.ZERO);
+            emptySummary.put("totalItemsSold", 0L);
+            emptySummary.put("productSales", new HashMap<>());
+            emptySummary.put("error", "Failed to load sales data");
+            
+            return emptySummary;
         }
-        
-        summary.put("totalRevenue", totalRevenue);
-        summary.put("totalItemsSold", totalItemsSold);
-        summary.put("productSales", new HashMap<>(productSalesMap)); // Map-based sales tracking
-        
-        System.out.println("📈 Sales Summary Generated:");
-        System.out.println("💰 Total Revenue: $" + totalRevenue);
-        System.out.println("📦 Total Items Sold: " + totalItemsSold);
-        System.out.println("🗺️ Product Sales Map size: " + productSalesMap.size());
-        
-        return summary;
     }
     
     /**
