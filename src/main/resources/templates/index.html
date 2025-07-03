@@ -717,17 +717,22 @@
             });
         }
 
-        // Load initial data
+        // Load initial data - FIXED VERSION
         async function loadInitialData() {
             console.log('📊 Loading initial data...');
             try {
-                await Promise.all([
-                    loadCategories(),
-                    loadVendors(),
-                    loadProducts(),
-                    loadSales(),
-                    loadDashboardStats()
-                ]);
+                // Load data in sequence to ensure proper order
+                await loadCategories();        // Load categories first
+                await loadVendors();          // Then vendors  
+                await loadProducts();         // Then products
+                await loadSales();           // Finally sales
+                await loadDashboardStats();  // Update dashboard
+                
+                // Populate dropdowns after all data is loaded
+                populateCategorySelects();
+                populateVendorSelect(); 
+                populateProductSelect();
+                
                 console.log('✅ Initial data loaded successfully');
             } catch (error) {
                 console.error('❌ Error loading initial data:', error);
@@ -766,7 +771,6 @@
         async function loadCategories() {
             try {
                 categories = await apiRequest('/categories');
-                populateCategorySelects();
                 console.log(`📂 Loaded ${categories.length} categories`);
             } catch (error) {
                 console.error('Error loading categories:', error);
@@ -777,7 +781,6 @@
         async function loadVendors() {
             try {
                 vendors = await apiRequest('/vendors');
-                populateVendorSelect();
                 displayVendors();
                 console.log(`🏪 Loaded ${vendors.length} vendors`);
             } catch (error) {
@@ -790,7 +793,6 @@
             try {
                 products = await apiRequest('/products');
                 displayProducts();
-                populateProductSelect();
                 console.log(`📦 Loaded ${products.length} products`);
             } catch (error) {
                 console.error('Error loading products:', error);
@@ -811,12 +813,9 @@
         // Load Dashboard Statistics
         async function loadDashboardStats() {
             try {
-                const [productsStats, vendorStats, salesStats, lowStockProducts, dataStructureStats] = await Promise.all([
-                    apiRequest('/products/stats'),
-                    apiRequest('/vendors/stats'),
+                const [salesStats, lowStockProducts] = await Promise.all([
                     apiRequest('/sales/stats'),
-                    apiRequest('/products/low-stock'),
-                    apiRequest('/products/stats')
+                    apiRequest('/products/low-stock')
                 ]);
 
                 // Update dashboard stats
@@ -829,7 +828,7 @@
                 displayLowStockProducts(lowStockProducts);
                 
                 // Display data structure stats
-                displayDataStructureStats(dataStructureStats);
+                displayDataStructureStats();
 
                 console.log('📊 Dashboard stats updated');
             } catch (error) {
@@ -837,25 +836,66 @@
             }
         }
 
-        // Populate category selects
+        // FIXED: Category Dropdown Population
         function populateCategorySelects() {
             const productCategorySelect = document.getElementById('productCategory');
             const categoryFilterSelect = document.getElementById('categoryFilter');
+            
+            if (!productCategorySelect || !categoryFilterSelect) {
+                console.error('Category select elements not found');
+                return;
+            }
             
             productCategorySelect.innerHTML = '<option value="">Select Category</option>';
             categoryFilterSelect.innerHTML = '<option value="">All Categories</option>';
             
             categories.forEach(category => {
+                // Fix 1: Use category properties, not vendor
+                const option = document.createElement('option');
+                option.value = category.categoryId;
+                option.textContent = `${category.name} (${category.dataStructureType})`;
+                productCategorySelect.appendChild(option);
+                
+                // Fix 2: Create separate option for filter
+                const filterOption = document.createElement('option');
+                filterOption.value = category.categoryId;
+                filterOption.textContent = category.name;
+                categoryFilterSelect.appendChild(filterOption);
+            });
+            
+            console.log(`✅ Populated ${categories.length} categories in dropdowns`);
+        }
+
+        // FIXED: Vendor Dropdown Population  
+        function populateVendorSelect() {
+            const vendorSelect = document.getElementById('productVendor');
+            
+            if (!vendorSelect) {
+                console.error('Vendor select element not found');
+                return;
+            }
+            
+            vendorSelect.innerHTML = '<option value="">Select Vendor</option>';
+            
+            vendors.forEach(vendor => {
                 const option = document.createElement('option');
                 option.value = vendor.vendorId;
                 option.textContent = vendor.name;
                 vendorSelect.appendChild(option);
             });
+            
+            console.log(`✅ Populated ${vendors.length} vendors in dropdown`);
         }
 
-        // Populate product select for sales
+        // Fixed Product Dropdown Population for Sales
         function populateProductSelect() {
             const productSelect = document.getElementById('saleProduct');
+            
+            if (!productSelect) {
+                console.error('Product select element not found');
+                return;
+            }
+            
             productSelect.innerHTML = '<option value="">Select Product</option>';
             
             products.forEach(product => {
@@ -865,6 +905,8 @@
                 option.dataset.productData = JSON.stringify(product);
                 productSelect.appendChild(option);
             });
+            
+            console.log(`✅ Populated ${products.length} products in sales dropdown`);
         }
 
         // Update product info when product is selected for sale
@@ -878,7 +920,7 @@
                 const category = categories.find(c => c.categoryId === product.category.categoryId);
                 
                 productInfo.innerHTML = `
-                    <strong>Price:</strong> ${product.price} | 
+                    <strong>Price:</strong> $${product.price} | 
                     <strong>Stock:</strong> ${product.quantityInStock} | 
                     <strong>Category:</strong> ${category ? category.name : 'Unknown'} | 
                     <strong>Data Structure:</strong> ${category ? category.dataStructureType : 'Unknown'}
@@ -927,7 +969,7 @@
                         <td>${category ? category.name : 'Unknown'}</td>
                         <td><span class="status-badge" style="background: #667eea; color: white;">${category ? category.dataStructureType : 'Unknown'}</span></td>
                         <td>${product.quantityInStock}</td>
-                        <td>${product.price}</td>
+                        <td>$${product.price}</td>
                         <td>${vendor ? vendor.name : 'Unknown'}</td>
                         <td>
                             <span class="status-badge ${isLowStock ? 'status-low-stock' : 'status-good-stock'}">
@@ -1018,8 +1060,8 @@
                         <td>#${sale.saleId}</td>
                         <td>${sale.product.name}</td>
                         <td>${sale.quantitySold}</td>
-                        <td>${sale.unitPrice}</td>
-                        <td><strong>${sale.totalAmount}</strong></td>
+                        <td>$${sale.unitPrice}</td>
+                        <td><strong>$${sale.totalAmount}</strong></td>
                         <td>${sale.customerName}</td>
                         <td>${saleDate}</td>
                     </tr>
@@ -1073,7 +1115,7 @@
         }
 
         // Display data structure statistics
-        function displayDataStructureStats(stats) {
+        function displayDataStructureStats() {
             const dataStructureStats = document.getElementById('dataStructureStats');
             
             const stackCategories = categories.filter(c => c.dataStructureType === 'STACK');
@@ -1131,6 +1173,7 @@
                 clearForm('productForm');
                 await loadProducts();
                 await loadDashboardStats();
+                populateProductSelect(); // Update product dropdown for sales
             } catch (error) {
                 console.error('Error adding product:', error);
             }
@@ -1158,6 +1201,7 @@
                 clearForm('vendorForm');
                 await loadVendors();
                 await loadDashboardStats();
+                populateVendorSelect(); // Update vendor dropdown
             } catch (error) {
                 console.error('Error adding vendor:', error);
             }
@@ -1177,11 +1221,12 @@
                     body: JSON.stringify({ quantity: quantity, customerName: customerName })
                 });
 
-                showAlert(`Sale completed successfully! Total: ${response.totalAmount}`, 'success');
+                showAlert(`Sale completed successfully! Total: $${response.totalAmount}`, 'success');
                 clearForm('saleForm');
                 await loadProducts();
                 await loadSales();
                 await loadDashboardStats();
+                populateProductSelect(); // Update product dropdown with new stock levels
             } catch (error) {
                 console.error('Error issuing sale:', error);
             }
@@ -1277,7 +1322,9 @@
                 
                 showAlert('Vendor HashMap loaded successfully!', 'success');
                 
-                // You could display this in a modal or dedicated section
+                // Display in vendors table temporarily
+                document.getElementById('vendorsTable').innerHTML = mapContent + document.getElementById('vendorsTable').innerHTML;
+                
                 console.log('Vendor HashMap:', vendorMap);
             } catch (error) {
                 console.error('Error loading vendor HashMap:', error);
@@ -1294,7 +1341,7 @@
                         <h4>📈 Sales Summary (Map-based tracking)</h4>
                         <div class="stats-grid">
                             <div class="stat-card">
-                                <h4>${summary.totalRevenue || 0}</h4>
+                                <h4>$${summary.totalRevenue || 0}</h4>
                                 <p>Total Revenue</p>
                             </div>
                             <div class="stat-card">
@@ -1341,7 +1388,7 @@
                         <tr>
                             <td><strong>${name}</strong></td>
                             <td>${quantity}</td>
-                            <td>${revenue}</td>
+                            <td>$${revenue}</td>
                         </tr>
                     `;
                 });
@@ -1420,7 +1467,7 @@
                         
                         <div class="stats-grid">
                             <div class="stat-card">
-                                <h4>${salesReport.totalRevenue || 0}</h4>
+                                <h4>$${salesReport.totalRevenue || 0}</h4>
                                 <p>Total Revenue</p>
                             </div>
                             <div class="stat-card">
@@ -1505,7 +1552,7 @@
                                 <h5>💰 Sales Summary</h5>
                                 <div class="stats-grid">
                                     <div class="stat-card">
-                                        <h4>${overview.salesSummary.totalRevenue || 0}</h4>
+                                        <h4>$${overview.salesSummary.totalRevenue || 0}</h4>
                                         <p>Total Revenue</p>
                                     </div>
                                     <div class="stat-card">
@@ -1722,6 +1769,26 @@
             }
         }
 
+        // Debug function to check dropdown states
+        function debugDropdowns() {
+            console.log('🔍 Debugging Dropdowns:');
+            console.log('Categories loaded:', categories.length);
+            console.log('Vendors loaded:', vendors.length);
+            console.log('Products loaded:', products.length);
+            
+            const elements = [
+                'productCategory',
+                'categoryFilter', 
+                'productVendor',
+                'saleProduct'
+            ];
+            
+            elements.forEach(id => {
+                const element = document.getElementById(id);
+                console.log(`${id}:`, element ? `${element.options.length} options` : 'NOT FOUND');
+            });
+        }
+
         // Auto-refresh dashboard every 30 seconds
         setInterval(() => {
             if (document.getElementById('dashboard').classList.contains('active')) {
@@ -1735,20 +1802,4 @@
         console.log('⚡ Algorithms: Linear Search (O(n)), QuickSort (O(n log n)), HashMap operations (O(1))');
     </script>
 </body>
-</html>value = category.categoryId;
-                option.textContent = `${category.name} (${category.dataStructureType})`;
-                productCategorySelect.appendChild(option);
-                
-                const filterOption = option.cloneNode(true);
-                categoryFilterSelect.appendChild(filterOption);
-            });
-        }
-
-        // Populate vendor select
-        function populateVendorSelect() {
-            const vendorSelect = document.getElementById('productVendor');
-            vendorSelect.innerHTML = '<option value="">Select Vendor</option>';
-            
-            vendors.forEach(vendor => {
-                const option = document.createElement('option');
-                option.
+</html>
