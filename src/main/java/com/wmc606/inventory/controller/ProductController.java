@@ -28,9 +28,7 @@ import com.wmc606.inventory.repository.VendorRepository;
 import com.wmc606.inventory.service.InventoryManager;
 
 /**
- * ProductController - REST API endpoints for product management
- * Handles operations using data structures based on product categories
- * FIXED VERSION with enhanced error handling and validation
+ * ProductController - Enhanced with debugging for DataStructureType issues
  */
 @RestController
 @RequestMapping("/api/products")
@@ -90,128 +88,172 @@ public class ProductController {
     }
     
     /**
-     * Add new product with quantity (uses data structures) - ENHANCED ERROR HANDLING
+     * Add new product - ENHANCED WITH DEBUGGING
      * POST /api/products
      */
     @PostMapping
     public ResponseEntity<?> addProduct(@RequestBody ProductRequest request) {
+        System.out.println("🚀 DEBUG: Starting addProduct...");
+        
         try {
-            System.out.println("🌐 API: Adding new product - DEBUG MODE");
-            System.out.println("📦 Product name: " + request.getProduct().getName());
+            // STEP 1: Validate request structure
+            if (request == null) {
+                System.err.println("❌ Request is null");
+                return ResponseEntity.badRequest()
+                    .body(Map.of("error", "Request cannot be null"));
+            }
+            
+            if (request.getProduct() == null) {
+                System.err.println("❌ Product data is null");
+                return ResponseEntity.badRequest()
+                    .body(Map.of("error", "Product data cannot be null"));
+            }
+            
+            if (request.getQuantity() == null || request.getQuantity() <= 0) {
+                System.err.println("❌ Invalid quantity: " + request.getQuantity());
+                return ResponseEntity.badRequest()
+                    .body(Map.of("error", "Quantity must be greater than 0"));
+            }
+            
+            Product productData = request.getProduct();
+            System.out.println("📦 Product name: " + productData.getName());
             System.out.println("📊 Quantity: " + request.getQuantity());
             
-            // DEBUG: Check the incoming category data
-            Product productData = request.getProduct();
+            // STEP 2: Debug Category Information
             Category incomingCategory = productData.getCategory();
-            
-            System.out.println("🔍 DEBUG: Incoming category info:");
-            if (incomingCategory != null) {
-                System.out.println("   - Category ID from frontend: " + incomingCategory.getCategoryId());
-                System.out.println("   - Category name from frontend: " + incomingCategory.getName());
-                System.out.println("   - Category dataStructureType from frontend: " + incomingCategory.getDataStructureType());
-            } else {
-                System.out.println("   - ❌ Category is NULL from frontend!");
+            if (incomingCategory == null) {
+                System.err.println("❌ Category is null in request");
                 return ResponseEntity.badRequest()
                     .body(Map.of("error", "Category cannot be null"));
             }
             
-            // DEBUG: Fetch the category from database
             Long categoryId = incomingCategory.getCategoryId();
-            System.out.println("🔍 DEBUG: Looking up category ID " + categoryId + " in database...");
+            System.out.println("🔍 DEBUG: Requested Category ID: " + categoryId);
             
-            // ENHANCED: Check for invalid category IDs
-            if (categoryId == null || categoryId < 1 || categoryId > 11) {
-                System.out.println("❌ DEBUG: Invalid category ID: " + categoryId + ". Valid range is 1-11");
+            if (categoryId == null) {
+                System.err.println("❌ Category ID is null");
                 return ResponseEntity.badRequest()
-                    .body(Map.of("error", "Invalid category ID: " + categoryId + ". Valid categories are 1-11", 
-                               "validCategories", "1=Beverages, 2=Bread, 3=Canned, 4=Dairy, 5=Dry/Baking, 6=Frozen, 7=Meat, 8=Produce, 9=Cleaners, 10=Paper, 11=Personal Care"));
+                    .body(Map.of("error", "Category ID cannot be null"));
             }
             
+            // STEP 3: Validate Category ID Range
+            if (categoryId < 1 || categoryId > 11) {
+                System.err.println("❌ Invalid category ID range: " + categoryId);
+                return ResponseEntity.badRequest()
+                    .body(Map.of("error", "Invalid category ID: " + categoryId + ". Valid categories are 1-11"));
+            }
+            
+            // STEP 4: Fetch and DEBUG Category from Database
             Optional<Category> categoryOptional = categoryRepository.findById(categoryId);
             if (!categoryOptional.isPresent()) {
-                System.out.println("❌ DEBUG: Category not found in database with ID: " + categoryId);
+                System.err.println("❌ Category not found in database: " + categoryId);
                 
-                // ENHANCED: Show available categories for debugging
-                System.out.println("🔍 DEBUG: Available categories in database:");
+                // DEBUG: Show what categories ARE available
+                System.out.println("🔍 DEBUG: Available categories:");
                 categoryRepository.findAll().forEach(cat -> 
-                    System.out.println("   - ID " + cat.getCategoryId() + ": " + cat.getName() + " (" + cat.getDataStructureType() + ")")
+                    System.out.println("   ID " + cat.getCategoryId() + ": " + cat.getName())
                 );
                 
                 return ResponseEntity.badRequest()
-                    .body(Map.of("error", "Category not found with ID: " + categoryId, 
-                               "suggestion", "Please refresh the page and try again. Available categories: 1-11"));
+                    .body(Map.of("error", "Category not found with ID: " + categoryId));
             }
             
             Category dbCategory = categoryOptional.get();
             System.out.println("✅ DEBUG: Category found in database:");
             System.out.println("   - ID: " + dbCategory.getCategoryId());
             System.out.println("   - Name: " + dbCategory.getName());
-            System.out.println("   - DataStructureType: " + dbCategory.getDataStructureType());
-            System.out.println("   - Description: " + dbCategory.getDescription());
             
-            // ENHANCED: Check if dataStructureType is null with better error message
-            if (dbCategory.getDataStructureType() == null) {
-                System.out.println("❌ DEBUG: DataStructureType is NULL in database category!");
+            // STEP 5: DEBUG DataStructureType specifically
+            Category.DataStructureType dataStructureType = null;
+            try {
+                dataStructureType = dbCategory.getDataStructureType();
+                System.out.println("   - DataStructureType: " + dataStructureType);
+            } catch (Exception e) {
+                System.err.println("💀 ERROR getting DataStructureType: " + e.getMessage());
+                e.printStackTrace();
                 
-                // Try to fix it automatically based on category ID
-                Category.DataStructureType fixedType = null;
+                // Try to fix it immediately
+                Category.DataStructureType correctType = null;
                 if (categoryId >= 1 && categoryId <= 4) {
-                    fixedType = Category.DataStructureType.STACK;
+                    correctType = Category.DataStructureType.STACK;
                 } else if (categoryId >= 5 && categoryId <= 7) {
-                    fixedType = Category.DataStructureType.QUEUE;
+                    correctType = Category.DataStructureType.QUEUE;
                 } else if (categoryId >= 8 && categoryId <= 11) {
-                    fixedType = Category.DataStructureType.LIST;
+                    correctType = Category.DataStructureType.LIST;
                 }
                 
-                if (fixedType != null) {
-                    System.out.println("🔧 DEBUG: Auto-fixing DataStructureType to: " + fixedType);
-                    dbCategory.setDataStructureType(fixedType);
+                if (correctType != null) {
+                    System.out.println("🔧 EMERGENCY FIX: Setting DataStructureType to " + correctType);
+                    dbCategory.setDataStructureType(correctType);
                     dbCategory = categoryRepository.save(dbCategory);
-                    System.out.println("✅ DEBUG: DataStructureType fixed and saved");
+                    dataStructureType = correctType;
+                    System.out.println("✅ Emergency fix completed");
                 } else {
-                    return ResponseEntity.badRequest()
-                        .body(Map.of("error", "Category has null DataStructureType and cannot be auto-fixed. Category ID: " + categoryId));
+                    return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                        .body(Map.of("error", "Cannot determine correct DataStructureType for category " + categoryId));
                 }
             }
             
-            // Set the correct category from database
-            productData.setCategory(dbCategory);
+            if (dataStructureType == null) {
+                System.err.println("💀 DataStructureType is still null after all checks!");
+                return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Map.of("error", "System error: Category data structure type is invalid"));
+            }
             
-            // DEBUG: Verify vendor
-            if (productData.getVendor() != null && productData.getVendor().getVendorId() != null) {
-                Optional<Vendor> vendorOptional = vendorRepository.findById(productData.getVendor().getVendorId());
-                if (!vendorOptional.isPresent()) {
-                    System.out.println("❌ DEBUG: Vendor not found with ID: " + productData.getVendor().getVendorId());
-                    return ResponseEntity.badRequest()
-                        .body(Map.of("error", "Vendor not found with ID: " + productData.getVendor().getVendorId()));
-                }
-                productData.setVendor(vendorOptional.get());
-                System.out.println("✅ DEBUG: Vendor set: " + vendorOptional.get().getName());
-            } else {
-                System.out.println("❌ DEBUG: Vendor is null or has null ID");
+            // STEP 6: Validate Vendor
+            if (productData.getVendor() == null || productData.getVendor().getVendorId() == null) {
+                System.err.println("❌ Vendor is null or has null ID");
                 return ResponseEntity.badRequest()
-                    .body(Map.of("error", "Vendor cannot be null"));
+                    .body(Map.of("error", "Vendor must be selected"));
             }
             
-            System.out.println("🔍 DEBUG: About to call inventoryManager.addGoodsToInventory...");
+            Optional<Vendor> vendorOptional = vendorRepository.findById(productData.getVendor().getVendorId());
+            if (!vendorOptional.isPresent()) {
+                System.err.println("❌ Vendor not found: " + productData.getVendor().getVendorId());
+                return ResponseEntity.badRequest()
+                    .body(Map.of("error", "Vendor not found with ID: " + productData.getVendor().getVendorId()));
+            }
+            
+            // STEP 7: Set validated entities
+            productData.setCategory(dbCategory);
+            productData.setVendor(vendorOptional.get());
+            
+            System.out.println("✅ All validations passed. Adding product to inventory...");
+            System.out.println("📂 Category: " + dbCategory.getName() + " (" + dataStructureType + ")");
+            System.out.println("🏪 Vendor: " + vendorOptional.get().getName());
+            
+            // STEP 8: Add to inventory using InventoryManager
             Product savedProduct = inventoryManager.addGoodsToInventory(productData, request.getQuantity());
             
-            System.out.println("✅ DEBUG: Product added successfully with ID: " + savedProduct.getProductId());
+            System.out.println("🎉 Product added successfully!");
+            System.out.println("   - Product ID: " + savedProduct.getProductId());
+            System.out.println("   - Name: " + savedProduct.getName());
+            System.out.println("   - Quantity: " + savedProduct.getQuantityInStock());
+            System.out.println("   - Data Structure: " + dataStructureType);
+            
             return ResponseEntity.status(HttpStatus.CREATED).body(savedProduct);
             
         } catch (IllegalStateException e) {
-            System.err.println("❌ DEBUG: IllegalStateException in addProduct: " + e.getMessage());
+            System.err.println("💀 IllegalStateException in addProduct: " + e.getMessage());
             e.printStackTrace();
             return ResponseEntity.badRequest()
-                .body(Map.of("error", "Category data structure error", "message", e.getMessage(), 
-                           "solution", "Please refresh the page and ensure you select a valid category (1-11)"));
+                .body(Map.of(
+                    "error", "Category configuration error", 
+                    "message", e.getMessage(),
+                    "solution", "Please refresh the page and ensure you select a valid category (1-11)"
+                ));
             
         } catch (Exception e) {
-            System.err.println("❌ DEBUG: Exception in addProduct: " + e.getClass().getSimpleName());
-            System.err.println("❌ DEBUG: Exception message: " + e.getMessage());
+            System.err.println("💀 Unexpected error in addProduct: " + e.getClass().getSimpleName());
+            System.err.println("💀 Error message: " + e.getMessage());
             e.printStackTrace();
-            return ResponseEntity.badRequest()
-                .body(Map.of("error", "Failed to add product", "message", e.getMessage(), "type", e.getClass().getSimpleName()));
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                .body(Map.of(
+                    "error", "System error occurred", 
+                    "message", e.getMessage(),
+                    "type", e.getClass().getSimpleName(),
+                    "solution", "Please try again or contact support if the problem persists"
+                ));
         }
     }
     
@@ -282,7 +324,6 @@ public class ProductController {
         try {
             System.out.println("🌐 API: Getting products for category: " + categoryId);
             
-            // Validate category ID range
             if (categoryId < 1 || categoryId > 11) {
                 System.out.println("❌ Invalid category ID: " + categoryId);
                 return ResponseEntity.badRequest().build();
@@ -298,7 +339,7 @@ public class ProductController {
     }
     
     /**
-     * Search products (uses custom algorithms for categories 6-11)
+     * Search products
      * GET /api/products/search?searchTerm=...&categoryId=...
      */
     @GetMapping("/search")
@@ -310,7 +351,6 @@ public class ProductController {
             System.out.println("🔍 Search term: " + searchTerm);
             System.out.println("📂 Category: " + categoryId);
             
-            // Validate category ID if provided
             if (categoryId != null && (categoryId < 1 || categoryId > 11)) {
                 System.out.println("❌ Invalid category ID for search: " + categoryId);
                 return ResponseEntity.badRequest().build();
@@ -318,10 +358,8 @@ public class ProductController {
             
             List<Product> products;
             if (categoryId != null) {
-                // Use custom search algorithms for specific categories
                 products = inventoryManager.searchProducts(searchTerm, categoryId);
             } else {
-                // Search all products
                 products = productRepository.findByProductCodeContainingIgnoreCase(searchTerm);
             }
             
@@ -334,7 +372,7 @@ public class ProductController {
     }
     
     /**
-     * Sort products alphabetically (uses QuickSort for categories 6-11)
+     * Sort products alphabetically
      * GET /api/products/sort/{categoryId}
      */
     @GetMapping("/sort/{categoryId}")
@@ -342,7 +380,6 @@ public class ProductController {
         try {
             System.out.println("🌐 API: Sorting products for category: " + categoryId);
             
-            // Validate category ID range
             if (categoryId < 1 || categoryId > 11) {
                 System.out.println("❌ Invalid category ID for sorting: " + categoryId);
                 return ResponseEntity.badRequest().build();
@@ -375,7 +412,7 @@ public class ProductController {
     }
     
     /**
-     * Issue goods (make a sale) - uses data structure operations
+     * Issue goods (make a sale)
      * POST /api/products/{id}/issue
      */
     @PostMapping("/{id}/issue")
@@ -385,7 +422,6 @@ public class ProductController {
             System.out.println("📊 Quantity: " + request.getQuantity());
             System.out.println("👤 Customer: " + request.getCustomerName());
             
-            // Validate input
             if (request.getQuantity() == null || request.getQuantity() <= 0) {
                 return ResponseEntity.badRequest()
                     .body(Map.of("error", "Quantity must be greater than 0"));

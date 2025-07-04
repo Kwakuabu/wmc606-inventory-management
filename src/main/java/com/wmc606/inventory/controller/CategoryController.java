@@ -1,18 +1,29 @@
 package com.wmc606.inventory.controller;
 
-import com.wmc606.inventory.entities.Category;
-import com.wmc606.inventory.repository.CategoryRepository;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.CrossOrigin;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
 
-import java.util.List;
-import java.util.Map;
+import com.wmc606.inventory.entities.Category;
+import com.wmc606.inventory.repository.CategoryRepository;
 
 /**
- * CategoryController - REST API endpoints for category management
- * Categories determine which data structure is used for products
+ * CategoryController - Enhanced with debug endpoint
  */
 @RestController
 @RequestMapping("/api/categories")
@@ -33,7 +44,6 @@ public class CategoryController {
             List<Category> categories = categoryRepository.findAll();
             System.out.println("✅ Found " + categories.size() + " categories");
             
-            // Log data structure types for each category
             categories.forEach(category -> 
                 System.out.println("📂 " + category.getName() + " → " + category.getDataStructureType())
             );
@@ -66,6 +76,59 @@ public class CategoryController {
         } catch (Exception e) {
             System.err.println("❌ Error getting category: " + e.getMessage());
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+        }
+    }
+    
+    /**
+     * DEBUG endpoint to test category loading
+     * GET /api/categories/debug
+     */
+    @GetMapping("/debug")
+    public ResponseEntity<Map<String, Object>> debugCategories() {
+        try {
+            System.out.println("🔍 DEBUG: Testing all categories...");
+            
+            Map<String, Object> debugInfo = new HashMap<>();
+            List<Map<String, Object>> categoryDetails = new ArrayList<>();
+            
+            for (long i = 1; i <= 11; i++) {
+                Optional<Category> categoryOpt = categoryRepository.findById(i);
+                Map<String, Object> catInfo = new HashMap<>();
+                
+                if (categoryOpt.isPresent()) {
+                    Category cat = categoryOpt.get();
+                    catInfo.put("id", cat.getCategoryId());
+                    catInfo.put("name", cat.getName());
+                    
+                    try {
+                        catInfo.put("dataStructureType", cat.getDataStructureType().toString());
+                        catInfo.put("status", "OK");
+                        System.out.println("✅ Category " + i + ": " + cat.getName() + " → " + cat.getDataStructureType());
+                    } catch (Exception e) {
+                        catInfo.put("dataStructureType", "ERROR: " + e.getMessage());
+                        catInfo.put("status", "ERROR");
+                        System.err.println("❌ Category " + i + " ERROR: " + e.getMessage());
+                    }
+                } else {
+                    catInfo.put("id", i);
+                    catInfo.put("status", "MISSING");
+                    System.err.println("❌ Category " + i + " MISSING");
+                }
+                
+                categoryDetails.add(catInfo);
+            }
+            
+            debugInfo.put("categories", categoryDetails);
+            debugInfo.put("totalCount", categoryRepository.count());
+            
+            System.out.println("🔍 DEBUG: Total categories in database: " + categoryRepository.count());
+            
+            return ResponseEntity.ok(debugInfo);
+        } catch (Exception e) {
+            System.err.println("❌ Error in debug endpoint: " + e.getMessage());
+            e.printStackTrace();
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                .body(Map.of("error", e.getMessage(), "stackTrace", Arrays.toString(e.getStackTrace())));
         }
     }
     
@@ -173,7 +236,6 @@ public class CategoryController {
             System.out.println("📂 Category: " + category.getName());
             System.out.println("🔧 Data Structure: " + category.getDataStructureType());
             
-            // Check if category already exists
             if (categoryRepository.existsByName(category.getName())) {
                 System.out.println("⚠️ Category already exists: " + category.getName());
                 return ResponseEntity.badRequest()
@@ -250,11 +312,6 @@ public class CategoryController {
             );
             
             System.out.println("✅ Category statistics retrieved");
-            System.out.println("📊 Total categories: " + allCategories.size());
-            System.out.println("📚 Stack categories: " + stackCategories.size());
-            System.out.println("🚶 Queue categories: " + queueCategories.size());
-            System.out.println("📋 List categories: " + listCategories.size());
-            
             return ResponseEntity.ok(stats);
         } catch (Exception e) {
             System.err.println("❌ Error getting category statistics: " + e.getMessage());

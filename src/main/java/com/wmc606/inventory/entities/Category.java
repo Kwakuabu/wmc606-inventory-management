@@ -17,11 +17,7 @@ import jakarta.persistence.OneToMany;
 import jakarta.persistence.Table;
 
 /**
- * Category Entity - Represents product categories
- * Each category uses a different data structure:
- * - STACK: Categories 1-4 (Beverages, Bread, Canned, Dairy)
- * - QUEUE: Categories 5-7 (Dry/Baking, Frozen, Meat)
- * - LIST: Categories 8-11 (Produce, Cleaners, Paper, Personal Care)
+ * Enhanced Category Entity with safety checks and auto-repair
  */
 @Entity
 @Table(name = "categories")
@@ -35,22 +31,19 @@ public class Category {
     @Column(nullable = false, length = 100)
     private String name;
     
-    // FIXED: Ensure proper enum mapping with validation
     @Enumerated(EnumType.STRING)
-    @Column(name = "data_structure_type", nullable = false)
+    @Column(name = "data_structure_type")
     private DataStructureType dataStructureType;
     
     @Column(columnDefinition = "TEXT")
     private String description;
     
-    // FIXED: Add @JsonIgnore to prevent infinite recursion
     @OneToMany(mappedBy = "category", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
     @JsonIgnore
     private List<Product> products;
     
     /**
      * Enum for Data Structure Types
-     * Matches the database ENUM values exactly
      */
     public enum DataStructureType {
         STACK,  // Categories 1-4: LIFO operations
@@ -67,7 +60,7 @@ public class Category {
         this.description = description;
     }
     
-    // Getters and Setters with validation
+    // Getters and Setters
     public Long getCategoryId() { 
         return categoryId; 
     }
@@ -85,20 +78,71 @@ public class Category {
     }
     
     /**
-     * Get data structure type with null safety
-     * @return DataStructureType or throws exception if null
+     * Enhanced getDataStructureType with auto-repair and detailed logging
      */
     public DataStructureType getDataStructureType() { 
-        if (dataStructureType == null) {
-            throw new IllegalStateException("DataStructureType cannot be null for category: " + name + " (ID: " + categoryId + ")");
+        System.out.println("🔍 DEBUG: Getting DataStructureType for category " + categoryId + " (" + name + ")");
+        System.out.println("🔍 DEBUG: Raw dataStructureType value: " + dataStructureType);
+        
+        // If null, try auto-repair
+        if (dataStructureType == null && categoryId != null) {
+            System.err.println("⚠️ WARNING: DataStructureType is null for category " + categoryId + ". Attempting auto-repair...");
+            dataStructureType = getCorrectDataStructureType(categoryId);
+            
+            if (dataStructureType != null) {
+                System.out.println("🔧 Auto-repaired DataStructureType to: " + dataStructureType);
+                return dataStructureType;
+            }
         }
+        
+        if (dataStructureType == null) {
+            String expectedType = getExpectedDataStructureTypeString();
+            System.err.println("💀 CRITICAL: DataStructureType is still null after auto-repair attempt!");
+            System.err.println("💀 Category: " + name + " (ID: " + categoryId + ")");
+            System.err.println("💀 Expected: " + expectedType);
+            
+            throw new IllegalStateException(
+                "DataStructureType cannot be null for category: " + name + " (ID: " + categoryId + 
+                "). Expected: " + expectedType + ". Please check database integrity.");
+        }
+        
+        System.out.println("✅ DataStructureType retrieved successfully: " + dataStructureType);
         return dataStructureType; 
     }
     
-    public void setDataStructureType(DataStructureType dataStructureType) { 
-        if (dataStructureType == null) {
-            throw new IllegalArgumentException("DataStructureType cannot be null");
+    /**
+     * Get correct DataStructureType based on category ID
+     */
+    private DataStructureType getCorrectDataStructureType(Long categoryId) {
+        if (categoryId >= 1 && categoryId <= 4) {
+            return DataStructureType.STACK;
+        } else if (categoryId >= 5 && categoryId <= 7) {
+            return DataStructureType.QUEUE;
+        } else if (categoryId >= 8 && categoryId <= 11) {
+            return DataStructureType.LIST;
         }
+        return null;
+    }
+    
+    /**
+     * Get expected DataStructureType as string for error messages
+     */
+    private String getExpectedDataStructureTypeString() {
+        if (categoryId == null) return "Unknown (category ID is null)";
+        
+        if (categoryId >= 1 && categoryId <= 4) {
+            return "STACK (Categories 1-4: Beverages, Bread, Canned, Dairy)";
+        } else if (categoryId >= 5 && categoryId <= 7) {
+            return "QUEUE (Categories 5-7: Dry/Baking, Frozen, Meat)";
+        } else if (categoryId >= 8 && categoryId <= 11) {
+            return "LIST (Categories 8-11: Produce, Cleaners, Paper, Personal Care)";
+        }
+        
+        return "Invalid category ID: " + categoryId;
+    }
+    
+    public void setDataStructureType(DataStructureType dataStructureType) { 
+        System.out.println("🔧 Setting DataStructureType for category " + categoryId + " to: " + dataStructureType);
         this.dataStructureType = dataStructureType; 
     }
     
@@ -119,69 +163,61 @@ public class Category {
     }
     
     /**
-     * Check if this category uses STACK data structure
-     * @return true if STACK, false otherwise
+     * Safe check methods with exception handling
      */
     public boolean isStackCategory() {
-        return DataStructureType.STACK.equals(this.dataStructureType);
+        try {
+            return DataStructureType.STACK.equals(getDataStructureType());
+        } catch (Exception e) {
+            System.err.println("⚠️ Error checking if stack category: " + e.getMessage());
+            return categoryId != null && categoryId >= 1 && categoryId <= 4;
+        }
     }
     
-    /**
-     * Check if this category uses QUEUE data structure
-     * @return true if QUEUE, false otherwise
-     */
     public boolean isQueueCategory() {
-        return DataStructureType.QUEUE.equals(this.dataStructureType);
+        try {
+            return DataStructureType.QUEUE.equals(getDataStructureType());
+        } catch (Exception e) {
+            System.err.println("⚠️ Error checking if queue category: " + e.getMessage());
+            return categoryId != null && categoryId >= 5 && categoryId <= 7;
+        }
     }
     
-    /**
-     * Check if this category uses LIST data structure
-     * @return true if LIST, false otherwise
-     */
     public boolean isListCategory() {
-        return DataStructureType.LIST.equals(this.dataStructureType);
+        try {
+            return DataStructureType.LIST.equals(getDataStructureType());
+        } catch (Exception e) {
+            System.err.println("⚠️ Error checking if list category: " + e.getMessage());
+            return categoryId != null && categoryId >= 8 && categoryId <= 11;
+        }
     }
     
     /**
      * Get user-friendly description of data structure operations
-     * @return Description of operations for this data structure type
      */
     public String getDataStructureDescription() {
-        if (dataStructureType == null) {
-            return "Unknown data structure";
-        }
-        
-        switch (dataStructureType) {
-            case STACK:
-                return "LIFO (Last In, First Out) - O(1) Push/Pop operations";
-            case QUEUE:
-                return "FIFO (First In, First Out) - O(1) Enqueue/Dequeue operations";
-            case LIST:
-                return "Dynamic operations - O(1) Add, O(n) Search/Remove, O(n log n) Sort";
-            default:
-                return "Unknown data structure operations";
+        try {
+            switch (getDataStructureType()) {
+                case STACK:
+                    return "LIFO (Last In, First Out) - O(1) Push/Pop operations";
+                case QUEUE:
+                    return "FIFO (First In, First Out) - O(1) Enqueue/Dequeue operations";
+                case LIST:
+                    return "Dynamic operations - O(1) Add, O(n) Search/Remove, O(n log n) Sort";
+                default:
+                    return "Unknown data structure operations";
+            }
+        } catch (Exception e) {
+            return "Data structure configuration error: " + e.getMessage();
         }
     }
     
     /**
-     * Get the typical category IDs for this data structure type
-     * @return Range description for category IDs
+     * Debug method to check raw database value
      */
-    public String getCategoryRange() {
-        if (dataStructureType == null) {
-            return "Unknown range";
-        }
-        
-        switch (dataStructureType) {
-            case STACK:
-                return "Categories 1-4";
-            case QUEUE:
-                return "Categories 5-7";
-            case LIST:
-                return "Categories 8-11";
-            default:
-                return "Unknown range";
-        }
+    public String debugDataStructureType() {
+        return "Raw dataStructureType field value: " + dataStructureType + 
+               " (Category ID: " + categoryId + ", Name: " + name + ")";
     }
     
     @Override
@@ -197,12 +233,16 @@ public class Category {
         return categoryId != null ? categoryId.hashCode() : 0;
     }
     
+    /**
+     * Enhanced toString for debugging
+     */
     @Override
     public String toString() {
         return "Category{" +
                 "categoryId=" + categoryId +
                 ", name='" + name + '\'' +
-                ", dataStructureType=" + dataStructureType +
+                ", dataStructureType=" + dataStructureType + 
+                " (raw value from DB)" +
                 ", description='" + description + '\'' +
                 '}';
     }
